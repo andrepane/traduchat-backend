@@ -8,8 +8,8 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Pega aquí tus claves VAPID generadas con "npx web-push generate-vapid-keys"
-const VAPID_PUBLIC_KEY = "BJCEflnRPGc5M3lmxTHOY-5ApfvZkMkbH2TbIHxLDDjcYrW2e6GYl0gnFHTHfgp7jTfhoKMXwbA6vbB1ERMwGpI";
-const VAPID_PRIVATE_KEY = "t86nOTTzFlHbQ2WaFRdPZLu1W7tC6lV9epXUOzhjgFI";
+const VAPID_PUBLIC_KEY = "BAD_-7axfPLdzB5FKCNHGYXufRFCpVFDCBQl0-dcmqU8N8SchREL75EB6gRD6ZImhVt2mIYoiWDT4dGWX-LKqsY";
+const VAPID_PRIVATE_KEY = "1pFsXwPq1iQ787HqHbkdIQC8cY99ddGdYce_TKZJsLQ";
 
 webpush.setVapidDetails(
   "mailto:tuemail@dominio.com",
