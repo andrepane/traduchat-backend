@@ -1,55 +1,55 @@
 const express = require("express");
 const bodyParser = require("body-parser");
-const webpush = require("web-push");
 const cors = require("cors");
+const admin = require("firebase-admin");
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Pega aquí tus claves VAPID generadas con "npx web-push generate-vapid-keys"
-const VAPID_PUBLIC_KEY = "BAD_-7axfPLdzB5FKCNHGYXufRFCpVFDCBQl0-dcmqU8N8SchREL75EB6gRD6ZImhVt2mIYoiWDT4dGWX-LKqsY";
-const VAPID_PRIVATE_KEY = "1pFsXwPq1iQ787HqHbkdIQC8cY99ddGdYce_TKZJsLQ";
-
-webpush.setVapidDetails(
-  "mailto:tuemail@dominio.com",
-  VAPID_PUBLIC_KEY,
-  VAPID_PRIVATE_KEY
-);
-
-// En memoria: en producción usa una base de datos
-const subscriptions = {}; // { roomCode: [subscription, ...] }
-
-app.post("/subscribe", (req, res) => {
-  const { subscription, roomCode } = req.body;
-  if (!subscriptions[roomCode]) subscriptions[roomCode] = [];
-  // Evita duplicados
-  if (!subscriptions[roomCode].some(sub => sub.endpoint === subscription.endpoint)) {
-    subscriptions[roomCode].push(subscription);
-  }
-  res.status(201).json({ ok: true });
+// Inicializa Firebase Admin con tu cuenta de servicio
+const serviceAccount = require("./service-account.json");
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://traduchat-47658-default-rtdb.europe-west1.firebasedatabase.app"
 });
 
+// Enviar notificación a todos los tokens FCM de una sala
 app.post("/notify", async (req, res) => {
   const { roomCode, title, body } = req.body;
-  const subs = subscriptions[roomCode] || [];
-  const payload = JSON.stringify({
-    title,
-    body,
-    icon: "/icons/icon-192.png"
-  });
+  try {
+    // 1. Lee los usuarios de la sala
+    const salaSnapshot = await admin.database().ref(`rooms/${roomCode}`).once("value");
+    const salaData = salaSnapshot.val();
+    if (!salaData) return res.status(404).json({ error: "Sala no encontrada" });
 
-  let success = 0;
-  for (const sub of subs) {
-    try {
-      await webpush.sendNotification(sub, payload);
-      success++;
-    } catch (err) {
-      // Si falla, elimina la suscripción inválida
-      subscriptions[roomCode] = subscriptions[roomCode].filter(s => s.endpoint !== sub.endpoint);
-    }
+    // 2. Obtén la lista de usuarios (ajusta según tu estructura)
+    const usersSet = new Set();
+    Object.values(salaData).forEach(msg => {
+      if (msg && msg.from) usersSet.add(msg.from);
+    });
+    const users = Array.from(usersSet);
+
+    // 3. Lee los tokens FCM de esos usuarios
+    const tokensSnapshot = await admin.database().ref("fcmTokens").once("value");
+    const tokensData = tokensSnapshot.val() || {};
+    const tokens = users
+      .map(user => tokensData[user]?.token)
+      .filter(token => !!token);
+
+    if (tokens.length === 0) return res.json({ sent: 0, total: 0 });
+
+    // 4. Envía la notificación a todos los tokens
+    const message = {
+      notification: { title, body },
+      tokens: tokens
+    };
+    const response = await admin.messaging().sendMulticast(message);
+    res.json({ sent: response.successCount, total: tokens.length });
+  } catch (err) {
+    console.error("Error enviando notificaciones:", err);
+    res.status(500).json({ error: err.message });
   }
-  res.json({ sent: success, total: subs.length });
 });
 
 const PORT = process.env.PORT || 10000;
