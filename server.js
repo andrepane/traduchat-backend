@@ -19,16 +19,16 @@ app.post("/notify", async (req, res) => {
   const { roomCode, title, body } = req.body;
   try {
     // 1. Lee los usuarios de la sala
-    const salaSnapshot = await admin.database().ref(`rooms/${roomCode}`).once("value");
-    const salaData = salaSnapshot.val();
-    if (!salaData) return res.status(404).json({ error: "Sala no encontrada" });
+const usersSnapshot = await admin.database().ref(`rooms/${roomCode}/users`).once("value");
+const usersData = usersSnapshot.val() || {};
+const users = Object.keys(usersData);
 
-    // 2. Obtén la lista de usuarios (ajusta según tu estructura)
-    const usersSet = new Set();
-    Object.values(salaData).forEach(msg => {
-      if (msg && msg.from) usersSet.add(msg.from);
-    });
-    const users = Array.from(usersSet);
+// 2. Lee los tokens FCM de esos usuarios
+const tokensSnapshot = await admin.database().ref("fcmTokens").once("value");
+const tokensData = tokensSnapshot.val() || {};
+const tokens = users
+  .map(user => tokensData[user]?.token)
+  .filter(token => !!token);
 
     // 3. Lee los tokens FCM de esos usuarios
     const tokensSnapshot = await admin.database().ref("fcmTokens").once("value");
