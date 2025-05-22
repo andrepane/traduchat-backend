@@ -19,7 +19,7 @@ app.post("/notify", async (req, res) => {
   const { roomCode, title, body } = req.body;
   try {
     // 1. Lee los usuarios de la sala
-const usersSnapshot = await admin.database().ref(`rooms/${roomCode}/users`).once("value");
+const usersSnapshot = await admin.database().ref(`roomUsers/${roomCode}`).once("value");
 const usersData = usersSnapshot.val() || {};
 const users = Object.keys(usersData);
 
